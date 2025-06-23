@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Star Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.10/dist/hls.min.js"></script>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 20px; }
+        video { width: 100%; max-width: 800px; margin: 20px auto; background: #000; }
+        .status { color: green; font-weight: bold; margin: 20px; }
+        .error { color: red; }
+        button { padding: 8px 15px; margin: 0 5px; cursor: pointer; }
+        .active { background: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+    <h1>All Star Player</h1>
+    <video id="video" controls></video>
+    <div>
+        <button id="btn720" class="active">720p HD</button>
+        <button id="btn480">480p SD</button>
+        <button id="btn360">360p Mobile</button>
+    </div>
+    <div id="status" class="status">Loading player...</div>
+
+    <script>
+        const video = document.getElementById('video');
+        const statusEl = document.getElementById('status');
+        let hls;
+
+        function initPlayer() {
+            // 1. Basic checks
+            if (!Hls.isSupported()) {
+                showError("HLS not supported in your browser");
+                return;
+            }
+
+            // 2. Configure HLS.js
+            hls = new Hls({
+                enableWorker: false, // Required for local files
+                lowLatencyMode: false,
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60
+            });
+
+            // 3. Start with highest quality
+            loadQuality(0);
+
+            // 4. Error handling
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    showError(`${data.type}: ${data.details}`);
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            showError("Network error - check file paths");
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            hls.recoverMediaError();
+                            break;
+                    }
+                }
+            });
+        }
+
+        function loadQuality(level) {
+            if (!hls) return;
+
+            // Update UI
+            document.querySelectorAll('button').forEach((btn, i) => {
+                btn.classList.toggle('active', i === level);
+            });
+
+            // Load the master playlist
+            hls.loadSource('hls/master.m3u8');
+            hls.startLevel = level;
+            hls.attachMedia(video);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                statusEl.textContent = `Playing ${['720p','480p','360p'][level]}`;
+                statusEl.className = 'status';
+                video.play().catch(e => {
+                    statusEl.textContent = "Click play to start";
+                });
+            });
+        }
+
+        function showError(message) {
+            statusEl.textContent = message;
+            statusEl.className = 'status error';
+            console.error(message);
+        }
+
+        // Setup quality buttons
+        document.getElementById('btn720').addEventListener('click', () => loadQuality(0));
+        document.getElementById('btn480').addEventListener('click', () => loadQuality(1));
+        document.getElementById('btn360').addEventListener('click', () => loadQuality(2));
+
+        // Start when page loads
+        if (document.readyState === 'complete') {
+            initPlayer();
+        } else {
+            window.addEventListener('load', initPlayer);
+        }
+    </script>
+</body>
+</html>
